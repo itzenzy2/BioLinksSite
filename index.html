@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>enzy</title>
+    <!-- ADD THIS LINE FOR THE FAVICON -->
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Custom cursor style */
+        .custom-cursor {
+            position: fixed;
+            width: 25px; 
+            height: 25px; 
+            background: url('assets/custom_cursor.png') no-repeat center center;
+            background-size: contain;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Corrected Style for the matrix trail characters */
+        .matrix-trail-char {
+            position: fixed;
+            font-family: 'Courier New', monospace;
+            font-size: 18px; /* Changed from 16px to make it a bit bigger */
+            color: rgba(255, 255, 255, 0.9); /* Changed to white */
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.7); /* Changed to white glow */
+            pointer-events: none; /* Crucial: ensures it doesn't block clicks */
+            z-index: 9998; /* Needs to be behind your main custom cursor (which is 9999) */
+            opacity: 1; /* Characters start fully opaque for fading */
+            transform: translate(-50%, -50%); /* Centered on cursor position */
+            white-space: nowrap; /* Prevent characters from wrapping */
+        }
+        
+        body:not(.touch-device) {
+            cursor: none;
+        }
+
+        .custom-cursor.hidden {
+            display: none !important;
+        }
+
+
+        body {
+            background-color: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+        }
+
+        #background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .glitch-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+        
+        .volume-control, .transparency-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .volume-icon, .transparency-icon {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            display: flex;
+            color: white;
+            transition: transform 0.2s;
+        }
+        .volume-icon:hover, .transparency-icon:hover {
+            transform: scale(1.1);
+        }
+
+        .slider {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 5px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.3);
+            outline: none;
+            width: 0;
+            opacity: 0;
+            padding: 0;
+            pointer-events: none;
+            transition: width 0.3s ease-in-out, opacity 0.2s ease-in-out;
+        }
+
+        .volume-control:hover .slider,
+        .transparency-control:hover .slider {
+            width: 80px;
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .controls-dock {
+            position: fixed;
+            top: 20px; 
+            left: 20px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 15px;
+            z-index: 20;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 15px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+        }
+
+        #profile-block {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 820px;
+            min-height: 332px;
+            background: transparent;
+            padding: 20px;
+            border-radius: 15px;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            backdrop-filter: blur(2px);
+            opacity: 0; 
+            transform-style: preserve-3d; /* Kept for tilting effect */
+            transition: transform 0.5s ease-out;
+            pointer-events: auto;
+        }
+
+        .profile-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+        }
+
+        .profile-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+        }
+
+        .profile-picture {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            cursor: pointer;
+            pointer-events: auto;
+            opacity: 1 !important;
+        }
+
+        .profile-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .name-and-badges {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .name-container {
+            width: 135px;
+        }
+
+        
+        @font-face {
+            font-family: 'Angel Wish';
+            src: url('assets/Angel_wish.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        #profile-name {
+            font-family: 'Angel Wish', sans-serif; /* Reverted to original font */
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 3px;
+            color: #fff;
+            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.7));
+            opacity: 1 !important;
+        }
+
+        .badge-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .badge-container {
+            position: relative;
+            pointer-events: auto;
+            opacity: 1 !important;
+        }
+
+        .badge-container .tooltip {
+            visibility: hidden;
+            width: 120px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 100;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -60px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .badge-container:hover .tooltip {
+            visibility: visible;
+            opacity: 1 !important;
+        }
+
+        .badge {
+            width: 22px;
+            height: 22px;
+            transition: transform 0.3s;
+            pointer-events: auto;
+            opacity: 1 !important;
+            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.7));
+        }
+
+        .badge:hover {
+            transform: scale(1.2);
+        }
+
+        #profile-bio {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 18px;
+            line-height: 1.5;
+            margin-bottom: 10px;
+            opacity: 1 !important;
+        }
+        
+        .playlist-button-wrapper {
+            display: flex;
+            flex-wrap: wrap; 
+            justify-content: flex-start;
+            align-items: flex-start; /* CRITICAL FIX: Prevents vertical centering which causes wrapping */
+            gap: 15px; 
+            margin-top: 15px;
+        }
+
+        #discord-activity {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            box-shadow: 0 0 10px rgba(255,255,255,0.05);
+            padding: 0;
+            min-width: 270px;
+            max-width: 295px;
+            height: 72px;
+            flex-shrink: 1;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Center content vertically */
+        }
+
+        #activity-carousel-wrapper {
+            display: flex;
+            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+            height: 100%;
+        }
+
+        .activity-slide {
+            width: 100%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            font-family: 'Orbitron', sans-serif;
+            flex-direction: row; 
+        }
+        
+        .activity-details-container { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+        .activity-title { font-size: 13px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .activity-details { font-size: 14px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .activity-state { font-size: 12px; color: rgba(255, 255, 255, 0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .activity-progress-content { display: flex; flex-direction: column; gap: 4px; }
+        .activity-progress-bar-container { width: 100%; height: 5px; background-color: rgba(255, 255, 255, 0.2); border-radius: 2.5px; overflow: hidden; }
+        .activity-progress-bar-fill { width: 0%; height: 100%; border-radius: 2.5px; background: linear-gradient(to right, white, rgba(255, 255, 255, 0.7)); box-shadow: 0 0 5px #fff; transition: width 1s linear; }
+        .time-info-text { font-family: 'Courier New', monospace; font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+        
+        #spotify-widget {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            box-shadow: 0 0 10px rgba(255,255,255,0.05);
+            padding: 0; 
+            min-width: 270px;
+            max-width: 295px;
+            flex-shrink: 1; 
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden; 
+            display: flex;
+            flex-direction: column;
+            position: relative; /* Needed for icon positioning */
+            
+            max-height: 72px; /* Collapsed height */
+            transition: max-height 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        
+        #spotify-widget:hover {
+            max-height: 150px;
+        }
+
+        .spotify-logo-icon {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 24px;
+            height: 24px;
+            opacity: 0.6;
+            transition: opacity 0.3s;
+            z-index: 5;
+        }
+
+        #spotify-widget:hover .spotify-logo-icon {
+            opacity: 1;
+        }
+        
+        #spotify-playlist-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            flex-shrink: 0; /* Prevents this from shrinking */
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        #spotify-playlist-art { width: 40px; height: 40px; border-radius: 6px; flex-shrink: 0; background-color: rgba(255,255,255,0.1); }
+        #spotify-playlist-details { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+        #spotify-playlist-name { font-size: 13px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #spotify-playlist-creator { font-size: 11px; color: rgba(255, 255, 255, 0.7); }
+        
+        #spotify-track-list { 
+            flex: 1; /* Fills remaining space */
+            min-height: 0; /* Flexbox fix for scrolling */
+            overflow-y: auto; 
+            scrollbar-width: thin; 
+            scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+            
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out 0.15s; /* Fade in with a slight delay */
+            pointer-events: none;
+        }
+        
+        #spotify-widget:hover #spotify-track-list {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #spotify-track-list::-webkit-scrollbar { width: 4px; }
+        #spotify-track-list::-webkit-scrollbar-track { background: transparent; }
+        #spotify-track-list::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.3); border-radius: 2px; }
+
+        .spotify-track { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            padding: 6px 12px; 
+            transition: background-color 0.2s; 
+            flex-shrink: 0;
+            position: relative; /* Needed for play button positioning */
+        }
+        .spotify-track:hover { background-color: rgba(255, 255, 255, 0.05); }
+        .spotify-track-art { width: 32px; height: 32px; border-radius: 4px; flex-shrink: 0; background-color: rgba(255,255,255,0.1); }
+        .spotify-track-info { min-width: 0; }
+        .spotify-track-name { font-size: 13px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .spotify-track-artist { font-size: 11px; color: rgba(255, 255, 255, 0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .spotify-loading-text { color: rgba(255, 255, 255, 0.7); font-size: 14px; margin: 0; padding: 12px; }
+
+        .bio-separator { width: 100%; height: 1px; background: rgba(255, 255, 255, 0.2); margin: 20px 0; opacity: 1 !important; }
+        .profile-footer { display: flex; flex-direction: column; gap: 20px; width: 100%; margin-top: auto; align-items: center; }
+        .footer-bottom-row { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+        .visitor-counter { display: flex; align-items: center; gap: 8px; }
+        .visitor-icon { width: 18px; height: 18px; color: white; }
+        #visitor-count { font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1px; }
+        .social-links { display: flex; justify-content: center; gap: 12px; margin-top: 0; pointer-events: auto; opacity: 1 !important; flex-wrap: wrap; }
+        .social-icon { width: 36px; height: 36px; transition: transform 0.3s ease; filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.7)); pointer-events: auto; opacity: 1 !important; }
+        .social-icon:hover { transform: scale(1.4) rotateY(15deg); }
+        .glitch { animation: glitch 0.2s ease-in-out; }
+        @keyframes glitch { 0% { transform: translate(0); } 20% { transform: translate(-2px, 2px); } 40% { transform: translate(-2px, -2px); } 60% { transform: translate(2px, 2px); } 80% { transform: translate(2px, -2px); } 100% { transform: translate(0); } }
+        #start-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 30; cursor: pointer; }
+        #start-text { font-family: 'Courier New', monospace; font-size: 24px; color: #fff; text-align: center; }
+        .location-info { display: flex; align-items: center; gap: 8px; font-family: 'Orbitron', sans-serif; font-size: 14px; letter-spacing: 1px; }
+        .location-icon { width: 18px; height: 18px; color: white; }
+        #weather-info { display: flex; align-items: center; gap: 4px; }
+        .info-separator { color: rgba(255, 255, 255, 0.4); }
+        .crt-dotmatrix { pointer-events: none; position: fixed; inset: 0; z-index: 100000; opacity: 0.12; mix-blend-mode: multiply; background: repeating-linear-gradient(0deg, transparent 2px, #222 2px, #222 3px, transparent 3px, transparent 5px), repeating-linear-gradient(90deg, transparent 2px, #222 2px, #222 3px, transparent 3px, transparent 5px); }
+        
+        @media (max-width: 430px) { 
+            #profile-block { width: 90vw; max-width: 350px; min-height: 280px; padding: 15px; top: 50%; left: 50%; transform: translate(-50%, -50%); } 
+            .profile-header, .name-and-badges, .footer-bottom-row { flex-direction: column; align-items: center; text-align: center; } 
+            .playlist-button-wrapper { flex-direction: column; align-items: center; gap: 10px; justify-content: center; } 
+            
+            #discord-activity { 
+                min-width: unset; 
+                width: 100%; 
+                height: 80px; 
+            }
+            #spotify-widget { 
+                min-width: unset; 
+                width: 100%; 
+                height: 150px; 
+            }
+
+            #profile-name { font-size: 24px; letter-spacing: 2px; } 
+            .badge-group { justify-content: center; gap: 6px; } 
+            .badge-container .tooltip { width: 100px; font-size: 12px; margin-left: -50px; bottom: 110%; } 
+            #profile-bio { font-size: 14px; line-height: 1.4; } 
+            .bio-separator { margin: 15px 0; } 
+            .social-links { gap: 10px; justify-content: center; } 
+            .social-icon { width: 32px; height: 32px; } 
+            .location-info { flex-wrap: wrap; justify-content: center; } 
+            .controls-dock { top: 10px; left: 10px; padding: 8px; } 
+            .volume-control, .transparency-control { gap: 6px; } 
+            .volume-icon, .transparency-icon { width: 18px; height: 18px; } 
+            .volume-control:hover .slider, .transparency-control:hover .slider { width: 60px; } 
+            .slider::-webkit-slider-thumb { width: 10px; height: 10px; } 
+            #start-text { font-size: 18px; padding: 0 20px; } 
+            .activity-slide { padding: 8px 10px; gap: 10px; } 
+            .activity-details-container { gap: 2px; text-align: left; } 
+            .activity-progress-content { margin-top: 4px; width: 100%; gap: 2px; } 
+            .activity-progress-bar-container { width: 100%; height: 6px; border-radius: 3px; } 
+            .activity-progress-bar-fill { border-radius: 3px; } 
+            .time-info-text { width: 100%; text-align: right; font-size: 11px; color: rgba(255, 255, 255, 0.7); } 
+            .activity-title, .activity-details, .activity-state { white-space: normal; line-height: 1.2; } 
+            .activity-title { font-size: 12px; } 
+            .activity-details { font-size: 13px; } 
+            .activity-state { font-size: 11px; } 
+        }
+
+        /* --- Added new rules to shrink Discord activity content --- */
+        #discord-activity .activity-title { font-size: 11px; }
+        #discord-activity .activity-details { font-size: 12px; font-weight: 600; }
+        #discord-activity .activity-state { font-size: 10px; }
+        #discord-activity .time-info-text { font-size: 10px; }
+        #discord-activity .activity-progress-bar-container { height: 3px; }
+        #discord-activity img { width: 32px !important; height: 32px !important; border-radius: 6px; }
+        #discord-activity .activity-slide { gap: 7px; padding: 4px 7px; }
+        #discord-activity .activity-details-container { gap: 2px; }
+
+    </style>
+    
+</head>
+<body onload="initMedia()">
+    
+    <div class="custom-cursor"></div>
+    <div class="crt-dotmatrix"></div>
+
+    <div id="start-screen">
+        <div id="start-text"></div>
+    </div>
+
+    <div class="container">
+        <video id="background" autoplay loop muted playsinline webkit-playsinline><source src="assets/background.mp4" type="video/mp4"></video>
+        <div class="glitch-overlay"></div>
+
+        <div id="profile-block">
+            <div class="profile-header">
+                <div class="profile-container">
+                    <img src="assets/profile.gif" alt="Profile" class="profile-picture">
+                </div>
+                <div class="profile-info">
+                    <div class="name-and-badges">
+                        <div class="name-container"><div id="profile-name">enzy</div></div>
+                        <div class="badge-group">
+                            <div class="badge-container"><img src="assets/badge2.gif" alt="badge2" class="badge"><span class="tooltip">Verified</span></div>
+                            <div class="badge-container"><img src="assets/badge1.gif" alt="badge1" class="badge"><span class="tooltip">batman</span></div>
+                        </div>
+                    </div>
+                    <div id="profile-bio"></div>
+                    <div class="playlist-button-wrapper">
+                        <div id="discord-activity">
+                            <div id="activity-carousel-wrapper">
+                                <div class="activity-slide"><p style="color: rgba(255, 255, 255, 0.7); font-size: 14px; margin: 0;">Loading Discord activity...</p></div>
+                            </div>
+                        </div>
+                        
+                        <!-- FINAL, CORRECTED HTML STRUCTURE -->
+                        <div id="spotify-widget">
+                             <!-- NEW FEATURE: Added Spotify Logo -->
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Spotify_icon.svg/512px-Spotify_icon.svg.png" alt="Spotify Logo" class="spotify-logo-icon">
+                            <div id="spotify-playlist-info">
+                                <img id="spotify-playlist-art" src="">
+                                <div id="spotify-playlist-details">
+                                    <p id="spotify-playlist-name">Loading Playlist...</p>
+                                    <p id="spotify-playlist-creator"></p>
+                                </div>
+                            </div>
+                            <div id="spotify-track-list">
+                                <p class="spotify-loading-text">Loading tracks...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bio-separator"></div>
+
+            <div class="profile-footer">
+                <div class="social-links">
+                    <a href="https://discord.gg/qYeqWX4rEE" target="_blank"><img src="assets/discord.png" alt="Discord" class="social-icon"></a>
+                    <a href="https://github.com/" target="_blank"><img src="assets/github.png" alt="GitHub" class="social-icon"></a>
+                    <a href="https://youtube.com/@enzyplaysggs" target="_blank"><img src="assets/youtube.png" alt="YouTube" class="social-icon"></a>
+                    <a href="https://tiktok.com/@itzenzzy" target="_blank"><img src="assets/tiktok.png" alt="TikTok" class="social-icon"></a>
+                    <a href="https://steamcommunity.com/id/itzenzy" target="_blank"><img src="assets/steam.png" alt="Steam" class="social-icon"></a>
+                    <a href="https://twitch.tv/enzywastaken" target="_blank"><img src="assets/twitch.png" alt="Twitch" class="social-icon"></a>
+                    <a href="https://instagram.com/itz_enzy" target="_blank"><img src="assets/instagram.png" alt="Instagram" class="social-icon"></a>
+                    <a href="https://only-fans.uk/enzy" target="_blank"><img src="assets/onlyfans.png" alt="Onlyfans" class="social-icon"></a>
+                    <a href="https://open.spotify.com/user/bc1qnx253th4lde8plfvt6zx03v45s62p6llylg63g" target="_blank"><img src="assets/spotify.png" alt="Spotify" class="social-icon"></a>
+                    <a href="https://last.fm/user/itzenzy" target="_blank"><img src="assets/lastfm.png" alt="LastFM" class="social-icon"></a>
+                    <a href="https://x.com/enzyplays" target="_blank"><img src="assets/x.png" alt="X/Twitter" class="social-icon"></a>
+                    <a href="mailto:itzzenzyy@gmail.com"><img src="assets/mail.png" alt="Mail" class="social-icon"></a>
+                    <a href="https://t.me/itzenzy" target="_blank"><img src="assets/telegram.png" alt="Telegram" class="social-icon"></a>
+                    <a href="https://kick.com/itzenzzy" target="_blank"><img src="assets/kick.png" alt="Kick" class="social-icon"></a>
+                </div>
+                
+                <div class="footer-bottom-row">
+                    <div class="visitor-counter"><svg class="visitor-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg><span id="visitor-count">0</span></div>
+                    <div class="location-info"><svg class="location-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg><span>Kandy, Sri Lanka</span><span class="info-separator">|</span><span id="local-time">--:--:-- --</span><span class="info-separator">|</span><div id="weather-info"><img id="weather-icon" src="" alt="Weather" style="width: 24px; height: 24px; vertical-align: middle;"><span id="weather-temp">--°C</span></div></div>
+                </div>
+            </div>
+        </div>
+        <div class="controls-dock"><div class="volume-control"><svg id="volume-icon" class="volume-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg><input id="volume-slider" class="slider" type="range" min="0" max="1" step="0.01" value="0.3"></div><div class="transparency-control"><svg id="transparency-icon" class="transparency-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg><input id="transparency-slider" class="slider" type="range" min="0" max="1" step="0.01" value="0.6"></div></div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <audio id="track-preview-player"></audio>
+    <script src="script.js"></script>
+</body>
+</html>
